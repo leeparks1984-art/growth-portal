@@ -10,34 +10,39 @@ from datetime import datetime
 st.set_page_config(page_title="65kg Growth Portal", layout="wide")
 USER_DISLIKES = "Tuna and Coleslaw"
 
-# --- API KEY ---
-API_KEY = st.sidebar.text_input("Gemini API Key", type="password")
+# --- API KEY (HARDCODED) ---
+# ⚠️ SECURITY NOTE: Keep your GitHub Repo PRIVATE to protect this key.
+API_KEY = "AIzaSyAxknnmKqG90os-bsX68x5zebfoYYA2H4M"
 
-# --- ROBUST AI ENGINE ---
+# --- BULLETPROOF AI ENGINE ---
 def gemini_engine(prompt, mode="chat"):
-    if not API_KEY: return "⚠️ Enter API Key in Sidebar"
+    # Dual-Engine: Tries Flash first, then Pro if Flash fails
+    # This loop prevents the "404 Model Not Found" crash
+    models_to_try = ['gemini-1.5-flash', 'gemini-pro']
     
     try:
         genai.configure(api_key=API_KEY)
         
-        # Dual-Engine: Tries Flash first (fast), then Pro (smart) if Flash fails
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-        except:
-            model = genai.GenerativeModel('gemini-pro')
-
         system_rules = f"You are a Clinical Growth Assistant. Goal: 65kg. User HATES {USER_DISLIKES}. Never suggest them."
         
         if mode == "calories":
             full_prompt = f"Return ONLY the numeric integer calorie count for: {prompt}. No text."
         else:
             full_prompt = f"{system_rules} Context: {prompt}"
-            
-        response = model.generate_content(full_prompt)
-        return response.text
+
+        # Loop through models until one works
+        for model_name in models_to_try:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(full_prompt)
+                return response.text
+            except Exception:
+                continue # If model fails, try the next one
+        
+        return "⚠️ AI Connection Failed. Please update requirements.txt."
         
     except Exception as e:
-        return f"⚠️ AI Error: {str(e)}"
+        return f"⚠️ System Error: {str(e)}"
 
 # --- SESSION MEMORY ---
 if 'history' not in st.session_state:
@@ -69,7 +74,7 @@ st.title("🚀 My 65kg Growth Portal")
 df = st.session_state.history
 df['Timestamp'] = pd.to_datetime(df['Timestamp'])
 
-# 1. WEIGHT TRACKER (Top)
+# 1. WEIGHT TRACKER
 st.subheader("⚖️ Weight Journey to 65kg")
 fig_w = px.line(df, x='Timestamp', y='Weight', markers=True)
 fig_w.add_hline(y=65.0, line_dash="dash", line_color="red", annotation_text="Goal 65kg")
@@ -124,13 +129,12 @@ with col2:
     st.metric("Today's Total", f"{st.session_state.current_kcal} kcal")
     st.progress(min(st.session_state.current_kcal / 2400, 1.0))
 
-# --- 5. CHAT BOX (RESTORED HERE) ---
+# --- 5. CHAT BOX ---
 st.divider()
 st.subheader("💬 Chat with Growth Partner")
 st.write("Ask about Creon, Sugars, or your progress:")
 user_chat = st.text_input("Type your question here...")
 if user_chat:
-    # We pass the current context so Gemini knows your live stats
     context = f"User stats: Weight {w_in}kg, Glucose {g_in} ({trend_in}), Today's Calories {st.session_state.current_kcal}."
     response = gemini_engine(f"{context} User Question: {user_chat}")
     st.markdown(f"**Gemini:** {response}")
