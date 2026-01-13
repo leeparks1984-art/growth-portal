@@ -9,7 +9,7 @@ st.set_page_config(page_title="65kg Growth Portal", layout="wide")
 
 # --- GEMINI SETUP ---
 # Update: Changed model to 'gemini-1.5-flash' to fix the 404 error
-API_KEY = st.sidebar.text_input("AIzaSyC1fn8hdh0HLDp7gw68ieUGTd9C6v8AgaY", type="password")
+API_KEY = st.sidebar.text_input("API_Key", type="password")
 
 def ask_gemini(prompt):
     if not API_KEY:
