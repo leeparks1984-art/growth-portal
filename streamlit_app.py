@@ -17,15 +17,13 @@ API_KEY = st.sidebar.text_input("Gemini API Key", type="password")
 def gemini_engine(prompt, mode="chat"):
     if not API_KEY: return "⚠️ Enter API Key in Sidebar"
     
-    # We attempt to connect using the new library version
     try:
         genai.configure(api_key=API_KEY)
         
-        # 1. Try the fastest model first
+        # Dual-Engine: Tries Flash first (fast), then Pro (smart) if Flash fails
         try:
             model = genai.GenerativeModel('gemini-1.5-flash')
         except:
-            # 2. Fallback to the older model if flash fails
             model = genai.GenerativeModel('gemini-pro')
 
         system_rules = f"You are a Clinical Growth Assistant. Goal: 65kg. User HATES {USER_DISLIKES}. Never suggest them."
@@ -71,12 +69,12 @@ st.title("🚀 My 65kg Growth Portal")
 df = st.session_state.history
 df['Timestamp'] = pd.to_datetime(df['Timestamp'])
 
-# 1. WEIGHT TRACKER (Restored to Top)
+# 1. WEIGHT TRACKER (Top)
 st.subheader("⚖️ Weight Journey to 65kg")
 fig_w = px.line(df, x='Timestamp', y='Weight', markers=True)
 fig_w.add_hline(y=65.0, line_dash="dash", line_color="red", annotation_text="Goal 65kg")
 fig_w.update_traces(line_color='#00FF00', line_width=4)
-fig_w.update_layout(height=280, margin=dict(l=10, r=10, t=30, b=10))
+fig_w.update_layout(height=250, margin=dict(l=10, r=10, t=10, b=10))
 st.plotly_chart(fig_w, use_container_width=True)
 
 st.divider()
@@ -89,7 +87,7 @@ with col1:
     fig_g = go.Figure()
     fig_g.add_hrect(y0=3.9, y1=10.0, fillcolor="green", opacity=0.15, line_width=0, annotation_text="Target")
     fig_g.add_trace(go.Scatter(x=df['Timestamp'], y=df['Glucose'], mode='lines+markers', name='Glucose'))
-    fig_g.update_layout(height=350, yaxis_range=[0, 22], margin=dict(l=10, r=10, t=30, b=10))
+    fig_g.update_layout(height=350, yaxis_range=[0, 22], margin=dict(l=10, r=10, t=10, b=10))
     st.plotly_chart(fig_g, use_container_width=True)
 
     # 3. MEAL PLANNER
@@ -126,7 +124,18 @@ with col2:
     st.metric("Today's Total", f"{st.session_state.current_kcal} kcal")
     st.progress(min(st.session_state.current_kcal / 2400, 1.0))
 
-# --- HISTORY ---
+# --- 5. CHAT BOX (RESTORED HERE) ---
+st.divider()
+st.subheader("💬 Chat with Growth Partner")
+st.write("Ask about Creon, Sugars, or your progress:")
+user_chat = st.text_input("Type your question here...")
+if user_chat:
+    # We pass the current context so Gemini knows your live stats
+    context = f"User stats: Weight {w_in}kg, Glucose {g_in} ({trend_in}), Today's Calories {st.session_state.current_kcal}."
+    response = gemini_engine(f"{context} User Question: {user_chat}")
+    st.markdown(f"**Gemini:** {response}")
+
+# --- 6. HISTORY LOG ---
 st.divider()
 st.write("### 📓 History & Notes")
 st.dataframe(df.tail(5), use_container_width=True)
