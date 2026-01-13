@@ -13,31 +13,33 @@ USER_DISLIKES = "Tuna and Coleslaw"
 # --- API KEY ---
 API_KEY = st.sidebar.text_input("Gemini API Key", type="password")
 
-# --- ROBUST AI ENGINE (The Fix) ---
+# --- ROBUST AI ENGINE ---
 def gemini_engine(prompt, mode="chat"):
     if not API_KEY: return "⚠️ Enter API Key in Sidebar"
     
-    # We try 3 different keys to bypass the 404 error
-    models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
-    
-    genai.configure(api_key=API_KEY)
-    
-    for model_name in models_to_try:
+    # We attempt to connect using the new library version
+    try:
+        genai.configure(api_key=API_KEY)
+        
+        # 1. Try the fastest model first
         try:
-            model = genai.GenerativeModel(model_name)
-            system_rules = f"User has PI and Diabetes. Goal: 65kg. HATES {USER_DISLIKES}. Never suggest them."
+            model = genai.GenerativeModel('gemini-1.5-flash')
+        except:
+            # 2. Fallback to the older model if flash fails
+            model = genai.GenerativeModel('gemini-pro')
+
+        system_rules = f"You are a Clinical Growth Assistant. Goal: 65kg. User HATES {USER_DISLIKES}. Never suggest them."
+        
+        if mode == "calories":
+            full_prompt = f"Return ONLY the numeric integer calorie count for: {prompt}. No text."
+        else:
+            full_prompt = f"{system_rules} Context: {prompt}"
             
-            if mode == "calories":
-                full_prompt = f"Return ONLY the numeric calorie count for: {prompt}. No text."
-            else:
-                full_prompt = f"{system_rules} Context: {prompt}"
-                
-            response = model.generate_content(full_prompt)
-            return response.text # If successful, return immediately
-        except Exception:
-            continue # If fails, try the next model
-            
-    return "⚠️ AI Error: Could not connect. Please use Manual Entry for now."
+        response = model.generate_content(full_prompt)
+        return response.text
+        
+    except Exception as e:
+        return f"⚠️ AI Error: {str(e)}"
 
 # --- SESSION MEMORY ---
 if 'history' not in st.session_state:
@@ -53,7 +55,7 @@ st.sidebar.header("📝 Real-Time Entry")
 w_in = st.sidebar.number_input("Weight (kg)", 40.0, 80.0, 55.2, 0.1)
 g_in = st.sidebar.number_input("Glucose (mmol/L)", 2.0, 25.0, 13.6, 0.1)
 trend_in = st.sidebar.selectbox("Trend Arrow", ["→ (Stable)", "↑ (Rising)", "↗ (Slow Rise)", "↓ (Falling)", "↘ (Slow Fall)"])
-note_in = st.sidebar.text_input("Notes (e.g. '7 Creon taken')")
+note_in = st.sidebar.text_input("Notes (e.g. '7 Creon')")
 
 if st.sidebar.button("💾 SAVE DATA NOW"):
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -91,7 +93,7 @@ with col1:
     st.plotly_chart(fig_g, use_container_width=True)
 
     # 3. MEAL PLANNER
-    st.write("### 🍽️ AI Meal Suggestions")
+    st.write("### 🍽️ AI Meal Suggestions (No Tuna/Coleslaw)")
     m1, m2, m3 = st.columns(3)
     if m1.button("🍳 Breakfast"): 
         st.info(gemini_engine(f"Suggest Breakfast. Weight {w_in}kg. Glucose {g_in} {trend_in}."))
@@ -114,8 +116,7 @@ with col2:
                 st.success(f"Added {val} kcal!")
             else: st.error("AI returned unrealistic number.")
         else: 
-            # Fallback if AI fails
-            st.error("AI Busy. Please enter manually below.")
+            st.error("AI Busy. Please enter manually.")
 
     manual_k = st.number_input("Manual Calorie Entry", 0, 2000, 0)
     if st.button("Add Manual"):
